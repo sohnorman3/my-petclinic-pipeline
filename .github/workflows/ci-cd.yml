@@ -1,5 +1,5 @@
 # This workflow automates the CI/CD pipeline for Spring PetClinic:
-# 1. Compiles and Tests the application (Java 21, skipping Java 25+ check).
+# 1. Compiles and Tests the application (Java 25).
 # 2. Packages the application into a Docker image.
 # 3. Pushes the image to JFrog Artifactory.
 # 4. Publishes build info and runs an Xray security scan (gating the pipeline).
@@ -28,10 +28,10 @@ jobs:
         uses: actions/checkout@v4
 
       # --- 1. COMPILE AND RUN TESTS (Original Task Steps 1 & 2) ---
-      - name: Set up JDK 21
+      - name: Set up JDK 25
         uses: actions/setup-java@v4
         with:
-          java-version: '21' # Using stable JDK 21 (LTS)
+          java-version: '25' # Set to 25 to meet the project's minimum requirement
           distribution: 'temurin'
           cache: 'maven' # Caches Maven dependencies
 
@@ -39,10 +39,8 @@ jobs:
         run: chmod +x mvnw
 
       - name: Compile and Test with Maven
-        # CRITICAL FIX: Using the multi-line block syntax (the pipe |) to ensure the shell
-        # executes the command and passes the skip flag correctly.
-        run: |
-          ./mvnw clean install -Dmaven.enforcer.skip=true
+        # Since the runner is now Java 25, we run the standard command.
+        run: ./mvnw clean install
 
       # --- 2. SETUP JFROG CLI & CONFIGURE DOCKER LOGIN ---
       - name: Setup JFrog CLI and Configure Server
