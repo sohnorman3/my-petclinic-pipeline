@@ -1,6 +1,6 @@
 # This workflow automates the CI/CD pipeline for Spring PetClinic:
 # 1. Compiles and Tests the application (Java 21, skipping Java 25+ check).
-# 2. Packages the application into a Docker image.
+# 2. Packages the application into a Docker image (using Temurin).
 # 3. Pushes the image to JFrog Artifactory.
 # 4. Publishes build info and runs an Xray security scan (gating the pipeline).
 name: PetClinic CI/CD to JFrog
@@ -12,10 +12,7 @@ on:
   workflow_dispatch: # Allows manual triggering
 
 env:
-  # === CONFIGURATION VARIABLES (Populated by GitHub Secrets) ===
-  JFROG_PLATFORM_URL: ${{ secrets.JFROG_PLATFORM_URL }}
-  JFROG_USERNAME: ${{ secrets.JFROG_USERNAME }}
-  JFROG_ACCESS_TOKEN: ${{ secrets.JFROG_ACCESS_TOKEN }}
+  # This block is only for non-sensitive, static variables
   DOCKER_REPO_KEY: "petclinic-docker-local" # The name of your Artifactory Docker local/virtual repo
   IMAGE_NAME: "spring-petclinic"
   BUILD_NAME: "petclinic-docker-build"
@@ -31,7 +28,7 @@ jobs:
       - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
-          java-version: '21' # Reverting to stable LTS 21
+          java-version: '21' # Using stable LTS 21
           distribution: 'temurin'
           cache: 'maven' # Caches Maven dependencies
 
@@ -40,19 +37,20 @@ jobs:
 
       - name: Compile and Test with Maven
         # CRITICAL FIX: The skip flag is mandatory because the project requires Java 25, 
-        # but Java 25 base images are not yet stable/available on Docker Hub.
+        # but we are using Java 21 for stability.
         run: ./mvnw clean install -Dmaven.enforcer.skip=true
 
-      # --- 2. SETUP JFROG CLI & CONFIGURE DOCKER LOGIN ---
+      # --- 2. SETUP JFROG CLI & CONFIGURE DOCKER LOGIN (FINAL FIX HERE) ---
       - name: Setup JFrog CLI and Configure Server
         uses: jfrog/setup-jfrog-cli@v4
         with:
-          # Use secrets for secure connection
-          url: ${{ env.JFROG_PLATFORM_URL }}
-          access-token: ${{ env.JFROG_ACCESS_TOKEN }}
-          username: ${{ env.JFROG_USERNAME }}
+          # PASS SECRETS DIRECTLY: This bypasses the intermediate env variable step
+          # which was causing the protocol scheme error.
+          url: ${{ secrets.JFROG_PLATFORM_URL }} # <-- DIRECT ACCESS TO SECRET
+          access-token: ${{ secrets.JFROG_ACCESS_TOKEN }}
+          username: ${{ secrets.JFROG_USERNAME }}
           # The configuration is stored under the default server ID.
-
+          
       # Retrieve project version from pom.xml for dynamic tagging
       - name: Extract Project Version
         id: version
@@ -61,8 +59,9 @@ jobs:
       - name: Set Image Tag and Full Path
         id: tagging
         run: |
-          # 1. Strip the protocol (https://) from the platform URL to create a valid Docker registry hostname
-          REGISTRY_HOST=$(echo ${{ env.JFROG_PLATFORM_URL }} | sed 's|^https://||')
+          # 1. Strip the protocol (https://) from the secret URL to create a valid Docker registry hostname
+          # NOTE: We use the secret directly here to ensure the logic works
+          REGISTRY_HOST=$(echo ${{ secrets.JFROG_PLATFORM_URL }} | sed 's|^https://||')
           
           # 2. Define the TAG using the project version and short commit SHA
           SHORT_SHA=${{ github.sha }}
@@ -78,10 +77,10 @@ jobs:
       - name: Docker Login to Artifactory Registry
         run: |
           # The domain of the Artifactory registry is the platform URL hostname (protocol stripped).
-          REGISTRY_HOST=$(echo ${{ env.JFROG_PLATFORM_URL }} | sed 's|^https://||')
+          REGISTRY_HOST=$(echo ${{ secrets.JFROG_PLATFORM_URL }} | sed 's|^https://||')
           echo "Logging into $REGISTRY_HOST"
           # Use JFrog credentials (username and access token as password) for Docker login
-          echo "${{ env.JFROG_ACCESS_TOKEN }}" | docker login $REGISTRY_HOST -u ${{ env.JFROG_USERNAME }} --password-stdin
+          echo "${{ secrets.JFROG_ACCESS_TOKEN }}" | docker login $REGISTRY_HOST -u ${{ secrets.JFROG_USERNAME }} --password-stdin
 
       # --- 3. PACKAGE AND PUBLISH DOCKER IMAGE (Original Task Steps 4 & 5) ---
       - name: Docker Build and Tag
@@ -99,6 +98,7 @@ jobs:
       - name: Publish Build Info to Artifactory
         run: jf build publish ${{ env.BUILD_NAME }} ${{ env.BUILD_NUMBER }}
 
+      # --- 4. XRAY SCAN (Required Deliverable) ---
       - name: Xray Scan Build
         # Triggers a scan on the build published in the previous step
         run: jf bs ${{ env.BUILD_NAME }} ${{ env.BUILD_NUMBER }}
