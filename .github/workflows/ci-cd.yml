@@ -45,7 +45,6 @@ jobs:
         uses: jfrog/setup-jfrog-cli@v4
         with:
           # PASS SECRETS DIRECTLY: This bypasses the intermediate env variable step
-          # which was causing the protocol scheme error.
           url: ${{ secrets.JFROG_PLATFORM_URL }} # <-- DIRECT ACCESS TO SECRET
           access-token: ${{ secrets.JFROG_ACCESS_TOKEN }}
           username: ${{ secrets.JFROG_USERNAME }}
@@ -59,9 +58,9 @@ jobs:
       - name: Set Image Tag and Full Path
         id: tagging
         run: |
-          # 1. Strip the protocol (https://) from the secret URL to create a valid Docker registry hostname
-          # NOTE: We use the secret directly here to ensure the logic works
-          REGISTRY_HOST=$(echo ${{ secrets.JFROG_PLATFORM_URL }} | sed 's|^https://||')
+          # 1. FIX: Strip both the protocol (https://) AND the trailing slash (/$).
+          # This guarantees a clean REGISTRY_HOST for concatenation.
+          REGISTRY_HOST=$(echo ${{ secrets.JFROG_PLATFORM_URL }} | sed -e 's|^https://||' -e 's|/$||')
           
           # 2. Define the TAG using the project version and short commit SHA
           SHORT_SHA=${{ github.sha }}
@@ -77,7 +76,8 @@ jobs:
       - name: Docker Login to Artifactory Registry
         run: |
           # The domain of the Artifactory registry is the platform URL hostname (protocol stripped).
-          REGISTRY_HOST=$(echo ${{ secrets.JFROG_PLATFORM_URL }} | sed 's|^https://||')
+          # This sed command is updated to match the one used for tagging.
+          REGISTRY_HOST=$(echo ${{ secrets.JFROG_PLATFORM_URL }} | sed -e 's|^https://||' -e 's|/$||')
           echo "Logging into $REGISTRY_HOST"
           # Use JFrog credentials (username and access token as password) for Docker login
           echo "${{ secrets.JFROG_ACCESS_TOKEN }}" | docker login $REGISTRY_HOST -u ${{ secrets.JFROG_USERNAME }} --password-stdin
