@@ -98,5 +98,5 @@ jobs:
         run: jf build scan ${{ env.BUILD_NAME }} ${{ env.BUILD_NUMBER }} --wait
 
       - name: Print Final Image Path
-        run: echo "Successfully pushed image: ${{ steps.tagging.outputs.FULL_IMAGE_NAME }}"
-          
+        run: | # Added pipe to ensure clean termination
+          echo "Successfully pushed image: ${{ steps.tagging.outputs.FULL_IMAGE_NAME }}"
