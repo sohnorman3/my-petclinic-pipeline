@@ -1,6 +1,6 @@
 # This workflow automates the CI/CD pipeline for Spring PetClinic:
 # 1. Compiles and Tests the application (Java 21, skipping Java 25+ check).
-# 2. Packages the application into a Docker image (using Temurin).
+# 2. Packages the application into a Docker image.
 # 3. Pushes the image to JFrog Artifactory.
 # 4. Publishes build info and runs an Xray security scan (gating the pipeline).
 name: PetClinic CI/CD to JFrog
@@ -12,7 +12,8 @@ on:
   workflow_dispatch: # Allows manual triggering
 
 env:
-  # This block is only for non-sensitive, static variables
+  # NOTE: These are defined here only for cleaner debugging output, 
+  # but the steps pass the secrets directly.
   DOCKER_REPO_KEY: "petclinic-docker-local" # The name of your Artifactory Docker local/virtual repo
   IMAGE_NAME: "spring-petclinic"
   BUILD_NAME: "petclinic-docker-build"
@@ -28,7 +29,7 @@ jobs:
       - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
-          java-version: '21' # Using stable LTS 21
+          java-version: '21' # Using stable JDK 21 (LTS)
           distribution: 'temurin'
           cache: 'maven' # Caches Maven dependencies
 
@@ -36,20 +37,19 @@ jobs:
         run: chmod +x mvnw
 
       - name: Compile and Test with Maven
-        # CRITICAL FIX: The skip flag is mandatory because the project requires Java 25, 
-        # but we are using Java 21 for stability.
-        run: ./mvnw clean install -Dmaven.enforcer.skip=true
+        # CRITICAL FIX: Skip the Maven Enforcer Plugin rule that requires Java 25 or newer
+        run: |
+          ./mvnw clean install -Dmaven.enforcer.skip=true
 
-      # --- 2. SETUP JFROG CLI & CONFIGURE DOCKER LOGIN (FINAL FIX HERE) ---
+      # --- 2. SETUP JFROG CLI & CONFIGURE DOCKER LOGIN ---
       - name: Setup JFrog CLI and Configure Server
+        # CRITICAL FIX: Pass secrets directly to avoid 'unsupported protocol scheme' error
         uses: jfrog/setup-jfrog-cli@v4
         with:
-          # PASS SECRETS DIRECTLY: This bypasses the intermediate env variable step
-          url: ${{ secrets.JFROG_PLATFORM_URL }} # <-- DIRECT ACCESS TO SECRET
-          access-token: ${{ secrets.JFROG_ACCESS_TOKEN }}
-          username: ${{ secrets.JFROG_USERNAME }}
-          # The configuration is stored under the default server ID.
-          
+          url: ${{ secrets.JFROG_PLATFORM_URL }} # PASS DIRECTLY
+          access-token: ${{ secrets.JFROG_ACCESS_TOKEN }} # PASS DIRECTLY
+          username: ${{ secrets.JFROG_USERNAME }} # PASS DIRECTLY
+
       # Retrieve project version from pom.xml for dynamic tagging
       - name: Extract Project Version
         id: version
@@ -58,15 +58,14 @@ jobs:
       - name: Set Image Tag and Full Path
         id: tagging
         run: |
-          # 1. FIX: Strip both the protocol (https://) AND the trailing slash (/$).
-          # This guarantees a clean REGISTRY_HOST for concatenation.
-          REGISTRY_HOST=$(echo ${{ secrets.JFROG_PLATFORM_URL }} | sed -e 's|^https://||' -e 's|/$||')
+          # 1. Strip protocol and trailing slash from the URL to get a clean registry hostname
+          REGISTRY_HOST=$(echo ${{ secrets.JFROG_PLATFORM_URL }} | sed 's|^https://||' | sed 's|/$||')
           
           # 2. Define the TAG using the project version and short commit SHA
           SHORT_SHA=${{ github.sha }}
           TAG=${{ steps.version.outputs.PROJECT_VERSION }}-${SHORT_SHA::7}
           
-          # 3. Construct the FULL_IMAGE_NAME using only the REGISTRY_HOST (no protocol)
+          # 3. Construct the FULL_IMAGE_NAME using the clean REGISTRY_HOST
           FULL_IMAGE_NAME=${REGISTRY_HOST}/${{ env.DOCKER_REPO_KEY }}/${{ env.IMAGE_NAME }}:${TAG}
           
           echo "IMAGE_TAG=$TAG" >> $GITHUB_OUTPUT
@@ -75,9 +74,8 @@ jobs:
 
       - name: Docker Login to Artifactory Registry
         run: |
-          # The domain of the Artifactory registry is the platform URL hostname (protocol stripped).
-          # This sed command is updated to match the one used for tagging.
-          REGISTRY_HOST=$(echo ${{ secrets.JFROG_PLATFORM_URL }} | sed -e 's|^https://||' -e 's|/$||')
+          # Uses the same logic to get the clean REGISTRY_HOST for docker login
+          REGISTRY_HOST=$(echo ${{ secrets.JFROG_PLATFORM_URL }} | sed 's|^https://||' | sed 's|/$||')
           echo "Logging into $REGISTRY_HOST"
           # Use JFrog credentials (username and access token as password) for Docker login
           echo "${{ secrets.JFROG_ACCESS_TOKEN }}" | docker login $REGISTRY_HOST -u ${{ secrets.JFROG_USERNAME }} --password-stdin
