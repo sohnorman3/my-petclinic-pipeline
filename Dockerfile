@@ -1,8 +1,8 @@
 # --------------------------------------------------------------------------
 # Stage 1: Build the Application
-# Uses the stable, widely available OpenJDK 21 LTS image for the build environment.
+# Uses the stable, widely available Eclipse Temurin 21 LTS image for the build environment.
 # --------------------------------------------------------------------------
-FROM docker.io/library/openjdk:21-jdk AS build
+FROM eclipse-temurin:21-jdk AS build
 
 # Set the working directory inside the container
 WORKDIR /app
@@ -29,7 +29,7 @@ RUN mkdir -p target/dependency && (cd target/dependency; jar -xf ../*.jar)
 # Stage 2: Create the Final Runtime Image
 # Uses a lightweight JRE base image for security and size optimization.
 # --------------------------------------------------------------------------
-FROM docker.io/library/openjdk:21-jre-slim-buster
+FROM eclipse-temurin:21-jre-alpine
 
 # Expose the port the Spring Boot application runs on
 EXPOSE 8080
