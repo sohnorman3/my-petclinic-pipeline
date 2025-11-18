@@ -27,10 +27,10 @@ jobs:
 
       # --- 1. COMPILE AND RUN TESTS (Original Task Steps 1 & 2) ---
       # Dependencies are implicitly resolved from Maven Central during this step.
-      - name: Set up JDK 20
+      - name: Set up JDK 25
         uses: actions/setup-java@v4
         with:
-          java-version: '20' # <<< CHANGED from '17' to '20'
+          java-version: '25' # <<< CHANGED from '20' to '25'
           distribution: 'temurin'
           cache: 'maven' # Caches Maven dependencies
 
@@ -100,3 +100,4 @@ jobs:
       - name: Print Final Image Path
         run: |
           echo "Successfully pushed image: ${{ steps.tagging.outputs.FULL_IMAGE_NAME }}"
+
