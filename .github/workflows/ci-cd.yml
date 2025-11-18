@@ -99,3 +99,4 @@ jobs:
 
       - name: Print Final Image Path
         run: echo "Successfully pushed image: ${{ steps.tagging.outputs.FULL_IMAGE_NAME }}"
+          
