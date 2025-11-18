@@ -1,0 +1,101 @@
+# Workflow to build, test, package, and publish the Spring PetClinic application
+# to JFrog Artifactory, followed by an Xray scan.
+name: PetClinic CI/CD to JFrog
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch: # Allows manual triggering
+
+env:
+  # === CONFIGURATION VARIABLES - CORRECTED REFERENCES TO GITHUB SECRETS ===
+  # IMPORTANT: These must be stored as secrets in your GitHub repository settings.
+  JFROG_PLATFORM_URL: ${{ secrets.JFROG_PLATFORM_URL }}
+  JFROG_USERNAME: ${{ secrets.JFROG_USERNAME }}
+  JFROG_ACCESS_TOKEN: ${{ secrets.JFROG_ACCESS_TOKEN }}
+  DOCKER_REPO_KEY: "petclinic-docker-local" # The name of your Artifactory Docker local/virtual repo
+  IMAGE_NAME: "spring-petclinic"
+  BUILD_NAME: "petclinic-docker-build"
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # --- 1. COMPILE AND RUN TESTS (Original Task Steps 1 & 2) ---
+      # Dependencies are implicitly resolved from Maven Central during this step.
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'maven' # Caches Maven dependencies
+
+      - name: Compile and Test with Maven
+        run: ./mvnw clean install # Runs compile, test, and package
+
+      # --- 2. SETUP JFROG CLI & CONFIGURE DOCKER LOGIN ---
+      - name: Setup JFrog CLI and Configure Server
+        uses: jfrog/setup-jfrog-cli@v4
+        with:
+          # Use secrets for secure connection
+          url: ${{ env.JFROG_PLATFORM_URL }}
+          access-token: ${{ env.JFROG_ACCESS_TOKEN }}
+          username: ${{ env.JFROG_USERNAME }}
+          # The configuration is stored under the default server ID.
+
+      # Retrieve project version from pom.xml for dynamic tagging
+      - name: Extract Project Version
+        id: version
+        run: echo "PROJECT_VERSION=$(./mvnw help:evaluate -Dexpression=project.version -q -DforceStdout)" >> $GITHUB_OUTPUT
+
+      - name: Set Image Tag and Full Path
+        id: tagging
+        run: |
+          # Use short commit SHA as a dynamic tag
+          SHORT_SHA=${{ github.sha }}
+          TAG=${{ steps.version.outputs.PROJECT_VERSION }}-${SHORT_SHA::7}
+          FULL_IMAGE_NAME=${{ env.JFROG_PLATFORM_URL }}/${{ env.DOCKER_REPO_KEY }}/${{ env.IMAGE_NAME }}:${TAG}
+          echo "IMAGE_TAG=$TAG" >> $GITHUB_OUTPUT
+          echo "FULL_IMAGE_NAME=$FULL_IMAGE_NAME" >> $GITHUB_OUTPUT
+          echo "BUILD_NUMBER=$TAG" >> $GITHUB_ENV # Set build number for Artifactory Build Info
+
+      - name: Docker Login to Artifactory Registry
+        run: |
+          # The domain of the Artifactory registry is the platform URL hostname.
+          # We use jf c show to get the JFrog URL and then extract the hostname.
+          REGISTRY_HOST=$(echo ${{ env.JFROG_PLATFORM_URL }} | sed 's|^https://||')
+          echo "Logging into $REGISTRY_HOST"
+          # Use JFrog credentials for Docker login
+          echo "${{ env.JFROG_ACCESS_TOKEN }}" | docker login $REGISTRY_HOST -u ${{ env.JFROG_USERNAME }} --password-stdin
+
+      # --- 3. PACKAGE AND PUBLISH DOCKER IMAGE (Original Task Steps 4 & 5) ---
+      - name: Docker Build and Tag
+        run: |
+          docker build -t ${{ steps.tagging.outputs.FULL_IMAGE_NAME }} .
+
+      - name: Docker Push to Artifactory and Collect Build-Info
+        run: |
+          # Use JFrog CLI command 'jf docker push' to collect build-info automatically
+          jf docker push ${{ steps.tagging.outputs.FULL_IMAGE_NAME }} ${{ env.DOCKER_REPO_KEY }} \
+             --build-name=${{ env.BUILD_NAME }} \
+             --build-number=${{ env.BUILD_NUMBER }}
+
+      - name: Publish Build Info to Artifactory
+        run: jf build publish ${{ env.BUILD_NAME }} ${{ env.BUILD_NUMBER }}
+
+      # --- 4. XRAY SCAN (Required Deliverable) ---
+      - name: Xray Scan Build
+        # Triggers a scan on the build published in the previous step
+        run: jf bs ${{ env.BUILD_NAME }} ${{ env.BUILD_NUMBER }}
+
+      - name: Xray Wait For Scan Results and Fail on Violations
+        # Waits for the scan to finish and fails the job if any policy violations are found.
+        # This is crucial for pipeline gating.
+        run: jf build scan ${{ env.BUILD_NAME }} ${{ env.BUILD_NUMBER }} --wait
+
+      - name: Print Final Image Path
+        run: echo "Successfully pushed image: ${{ steps.tagging.outputs.FULL_IMAGE_NAME }}"
