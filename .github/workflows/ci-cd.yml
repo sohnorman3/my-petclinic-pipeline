@@ -36,8 +36,10 @@ jobs:
           cache: 'maven' # Caches Maven dependencies
 
       - name: Compile and Test with Maven
-        # CRITICAL FIX: Skip the Maven Enforcer Plugin rule that requires Java 25 or newer
-        run: ./mvnw clean install -Dmaven.enforcer.skip=true
+        # CRITICAL FIX: Using the multi-line block syntax (the pipe |) to ensure the shell
+        # executes the command and passes the skip flag correctly.
+        run: |
+          ./mvnw clean install -Dmaven.enforcer.skip=true
 
       # --- 2. SETUP JFROG CLI & CONFIGURE DOCKER LOGIN ---
       - name: Setup JFrog CLI and Configure Server
@@ -108,4 +110,3 @@ jobs:
       - name: Print Final Image Path
         run: |
           echo "Successfully pushed image: ${{ steps.tagging.outputs.FULL_IMAGE_NAME }}"
-
