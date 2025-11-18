@@ -2,8 +2,8 @@
 # Stage 1: Build the Application
 # Uses an OpenJDK image with Maven installed to build the project.
 # --------------------------------------------------------------------------
-# Updated to temurin-25 to meet the project's requirement (Java 25+)
-FROM maven:3.9.6-eclipse-temurin-25 AS build
+# Reverting to temurin-21. Java 25 tag is not yet available in Docker Hub for the maven image.
+FROM maven:3.9.6-eclipse-temurin-21 AS build
 
 # Set the working directory inside the container
 WORKDIR /app
@@ -32,8 +32,8 @@ RUN mkdir -p target/dependency && (cd target/dependency; jar -xf ../*.jar)
 # Stage 2: Create the Final Runtime Image
 # Uses a lightweight JRE base image for security and size optimization.
 # --------------------------------------------------------------------------
-# Updated to JRE 25 for consistency and modern environment
-FROM eclipse-temurin:25-jre-focal
+# Updated to JRE 21 for stability and consistency
+FROM eclipse-temurin:21-jre-focal
 
 # Set a non-root user for security best practices (Spring Boot app runs on 8080)
 # Note: The PetClinic app is designed to run in a typical Linux environment.

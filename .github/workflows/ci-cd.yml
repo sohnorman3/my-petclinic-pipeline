@@ -27,10 +27,10 @@ jobs:
 
       # --- 1. COMPILE AND RUN TESTS (Original Task Steps 1 & 2) ---
       # Dependencies are implicitly resolved from Maven Central during this step.
-      - name: Set up JDK 25
+      - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
-          java-version: '25' # Required Java 25+ for Spring PetClinic build
+          java-version: '21' # <<< CHANGED back to stable Java 21 LTS for Docker compatibility
           distribution: 'temurin'
           cache: 'maven' # Caches Maven dependencies
 
