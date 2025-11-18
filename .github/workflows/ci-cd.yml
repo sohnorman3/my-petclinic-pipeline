@@ -30,7 +30,7 @@ jobs:
       - name: Set up JDK 25
         uses: actions/setup-java@v4
         with:
-          java-version: '25' # <<< CHANGED from '20' to '25'
+          java-version: '25' # Required Java 25+ for Spring PetClinic build
           distribution: 'temurin'
           cache: 'maven' # Caches Maven dependencies
 
@@ -55,26 +55,32 @@ jobs:
       - name: Set Image Tag and Full Path
         id: tagging
         run: |
-          # Use short commit SHA as a dynamic tag
+          # 1. Strip the protocol (https://) from the platform URL to create a valid Docker registry hostname
+          REGISTRY_HOST=$(echo ${{ env.JFROG_PLATFORM_URL }} | sed 's|^https://||')
+          
+          # 2. Define the TAG using the project version and short commit SHA
           SHORT_SHA=${{ github.sha }}
           TAG=${{ steps.version.outputs.PROJECT_VERSION }}-${SHORT_SHA::7}
-          FULL_IMAGE_NAME=${{ env.JFROG_PLATFORM_URL }}/${{ env.DOCKER_REPO_KEY }}/${{ env.IMAGE_NAME }}:${TAG}
+          
+          # 3. Construct the FULL_IMAGE_NAME using only the REGISTRY_HOST (no protocol)
+          FULL_IMAGE_NAME=${REGISTRY_HOST}/${{ env.DOCKER_REPO_KEY }}/${{ env.IMAGE_NAME }}:${TAG}
+          
           echo "IMAGE_TAG=$TAG" >> $GITHUB_OUTPUT
           echo "FULL_IMAGE_NAME=$FULL_IMAGE_NAME" >> $GITHUB_OUTPUT
           echo "BUILD_NUMBER=$TAG" >> $GITHUB_ENV # Set build number for Artifactory Build Info
 
       - name: Docker Login to Artifactory Registry
         run: |
-          # The domain of the Artifactory registry is the platform URL hostname.
-          # We use jf c show to get the JFrog URL and then extract the hostname.
+          # The domain of the Artifactory registry is the platform URL hostname (protocol stripped).
           REGISTRY_HOST=$(echo ${{ env.JFROG_PLATFORM_URL }} | sed 's|^https://||')
           echo "Logging into $REGISTRY_HOST"
-          # Use JFrog credentials for Docker login
+          # Use JFrog credentials (username and access token as password) for Docker login
           echo "${{ env.JFROG_ACCESS_TOKEN }}" | docker login $REGISTRY_HOST -u ${{ env.JFROG_USERNAME }} --password-stdin
 
       # --- 3. PACKAGE AND PUBLISH DOCKER IMAGE (Original Task Steps 4 & 5) ---
       - name: Docker Build and Tag
         run: |
+          # Uses the FULL_IMAGE_NAME variable which now contains the correct registry hostname
           docker build -t ${{ steps.tagging.outputs.FULL_IMAGE_NAME }} .
 
       - name: Docker Push to Artifactory and Collect Build-Info
