@@ -1,5 +1,8 @@
-# Workflow to build, test, package, and publish the Spring PetClinic application
-# to JFrog Artifactory, followed by an Xray scan.
+# This workflow automates the CI/CD pipeline for Spring PetClinic:
+# 1. Compiles and Tests the application (Java 21, skipping Java 25+ check).
+# 2. Packages the application into a Docker image.
+# 3. Pushes the image to JFrog Artifactory.
+# 4. Publishes build info and runs an Xray security scan (gating the pipeline).
 name: PetClinic CI/CD to JFrog
 
 on:
@@ -9,8 +12,7 @@ on:
   workflow_dispatch: # Allows manual triggering
 
 env:
-  # === CONFIGURATION VARIABLES - CORRECTED REFERENCES TO GITHUB SECRETS ===
-  # IMPORTANT: These must be stored as secrets in your GitHub repository settings.
+  # === CONFIGURATION VARIABLES (Populated by GitHub Secrets) ===
   JFROG_PLATFORM_URL: ${{ secrets.JFROG_PLATFORM_URL }}
   JFROG_USERNAME: ${{ secrets.JFROG_USERNAME }}
   JFROG_ACCESS_TOKEN: ${{ secrets.JFROG_ACCESS_TOKEN }}
@@ -26,11 +28,10 @@ jobs:
         uses: actions/checkout@v4
 
       # --- 1. COMPILE AND RUN TESTS (Original Task Steps 1 & 2) ---
-      # Dependencies are implicitly resolved from Maven Central during this step.
       - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
-          java-version: '21' # Using stable JDK 21
+          java-version: '21' # Using stable JDK 21 (LTS)
           distribution: 'temurin'
           cache: 'maven' # Caches Maven dependencies
 
@@ -107,3 +108,4 @@ jobs:
       - name: Print Final Image Path
         run: |
           echo "Successfully pushed image: ${{ steps.tagging.outputs.FULL_IMAGE_NAME }}"
+
