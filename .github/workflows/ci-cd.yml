@@ -35,6 +35,9 @@ jobs:
           distribution: 'temurin'
           cache: 'maven' # Caches Maven dependencies
 
+      - name: Ensure Maven Wrapper is Executable
+        run: chmod +x mvnw
+
       - name: Compile and Test with Maven
         # CRITICAL FIX: Using the multi-line block syntax (the pipe |) to ensure the shell
         # executes the command and passes the skip flag correctly.
