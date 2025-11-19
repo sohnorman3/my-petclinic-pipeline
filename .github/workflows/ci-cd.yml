@@ -101,15 +101,15 @@ jobs:
 
       - name: Docker Push to Artifactory and Collect Build-Info
         run: |
-          # Use JFrog CLI command 'jf docker push' to collect build-info automatically
-          jf docker push ${{ steps.tagging.outputs.FULL_IMAGE_NAME }} ${{ env.DOCKER_REPO_KEY }} \
+          # FIX: Removed the redundant DOCKER_REPO_KEY argument, which caused a syntax error.
+          # The destination is implicitly contained in the tag (${{ steps.tagging.outputs.FULL_IMAGE_NAME }})
+          jf docker push ${{ steps.tagging.outputs.FULL_IMAGE_NAME }} \
              --build-name=${{ env.BUILD_NAME }} \
              --build-number=${{ env.BUILD_NUMBER }}
 
       - name: Publish Build Info to Artifactory
         run: jf build publish ${{ env.BUILD_NAME }} ${{ env.BUILD_NUMBER }}
 
-      # --- 4. XRAY SCAN (Required Deliverable) ---
       - name: Xray Scan Build
         # Triggers a scan on the build published in the previous step
         run: jf bs ${{ env.BUILD_NAME }} ${{ env.BUILD_NUMBER }}
