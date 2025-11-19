@@ -108,16 +108,19 @@ jobs:
              --build-number=${{ env.BUILD_NUMBER }}
 
       - name: Publish Build Info to Artifactory
-        run: jf build publish ${{ env.BUILD_NAME }} ${{ env.BUILD_NUMBER }}
+        # FIX: Updated to modern JFrog CLI command (jf rt bp)
+        run: jf rt bp ${{ env.BUILD_NAME }} ${{ env.BUILD_NUMBER }}
 
       - name: Xray Scan Build
+        # FIX: Updated to modern JFrog CLI command (jf rt bs)
         # Triggers a scan on the build published in the previous step
-        run: jf bs ${{ env.BUILD_NAME }} ${{ env.BUILD_NUMBER }}
+        run: jf rt bs ${{ env.BUILD_NAME }} ${{ env.BUILD_NUMBER }}
 
       - name: Xray Wait For Scan Results and Fail on Violations
+        # FIX: Updated to modern JFrog CLI command (jf rt bs)
         # Waits for the scan to finish and fails the job if any policy violations are found.
         # This is crucial for pipeline gating.
-        run: jf build scan ${{ env.BUILD_NAME }} ${{ env.BUILD_NUMBER }} --wait
+        run: jf rt bs ${{ env.BUILD_NAME }} ${{ env.BUILD_NUMBER }} --wait
 
       - name: Print Final Image Path
         run: |
