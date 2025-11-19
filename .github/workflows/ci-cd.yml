@@ -47,7 +47,7 @@ jobs:
       - name: Install JFrog CLI
         uses: jfrog/setup-jfrog-cli@v4
         with:
-          version: 2.x
+          version: 2  # <<< FIXED: Changed from '2.x' to '2'
 
       - name: Configure JFrog CLI Server
         run: |
