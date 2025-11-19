@@ -43,11 +43,10 @@ jobs:
 
       # --- 2. SETUP JFROG CLI & CONFIGURE DOCKER LOGIN ---
       - name: Setup JFrog CLI and Configure Server
-        # CRITICAL FIX: Pass secrets directly and use the full Artifactory path
+        # FINAL JFROG FIX: We explicitly pass the full Artifactory path here.
         uses: jfrog/setup-jfrog-cli@v4
         with:
-          # We assume the secret contains the base URL: https://<instance>.jfrog.io
-          # JFrog CLI requires the Artifactory service context path, which is usually /artifactory
+          # Use the platform URL and append the Artifactory service path to resolve the final error.
           url: ${{ secrets.JFROG_PLATFORM_URL }}/artifactory 
           access-token: ${{ secrets.JFROG_ACCESS_TOKEN }} 
           username: ${{ secrets.JFROG_USERNAME }}
