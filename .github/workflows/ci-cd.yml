@@ -17,6 +17,7 @@ env:
   DOCKER_REPO_KEY: "petclinic-docker-local" # The name of your Artifactory Docker local/virtual repo
   IMAGE_NAME: "spring-petclinic"
   BUILD_NAME: "petclinic-docker-build"
+  SERVER_ID: "JFROG_SERVER" # Unique ID for JFrog CLI configuration
 
 jobs:
   build-and-publish:
@@ -41,15 +42,25 @@ jobs:
         run: |
           ./mvnw clean install -Dmaven.enforcer.skip=true
 
-      # --- 2. SETUP JFROG CLI & CONFIGURE DOCKER LOGIN ---
-      - name: Setup JFrog CLI and Configure Server
-        # FINAL JFROG FIX: We explicitly pass the full Artifactory path here.
+      # --- 2. SETUP JFROG CLI & CONFIGURE DOCKER LOGIN (Manual CLI Setup) ---
+      # This replaces the jfrog/setup-jfrog-cli action to fix the persistent URL protocol error.
+      - name: Install JFrog CLI
         uses: jfrog/setup-jfrog-cli@v4
         with:
-          # Use the platform URL and append the Artifactory service path to resolve the final error.
-          url: ${{ secrets.JFROG_PLATFORM_URL }}/artifactory 
-          access-token: ${{ secrets.JFROG_ACCESS_TOKEN }} 
-          username: ${{ secrets.JFROG_USERNAME }}
+          version: 2.x
+
+      - name: Configure JFrog CLI Server
+        run: |
+          # Use JFrog CLI to add the server configuration manually.
+          # We explicitly define the Artifactory URL with the /artifactory context path 
+          # which resolves the "unsupported protocol scheme" error for SaaS instances.
+          jf c add ${{ env.SERVER_ID }} \
+            --url=${{ secrets.JFROG_PLATFORM_URL }}/artifactory \
+            --access-token=${{ secrets.JFROG_ACCESS_TOKEN }} \
+            --user=${{ secrets.JFROG_USERNAME }}
+          
+          # Use the newly configured server for all subsequent commands
+          jf c use ${{ env.SERVER_ID }}
 
       # Retrieve project version from pom.xml for dynamic tagging
       - name: Extract Project Version
@@ -60,7 +71,6 @@ jobs:
         id: tagging
         run: |
           # 1. Strip protocol and trailing slash from the URL to get a clean registry hostname
-          # Using the original secret value here, as the JFrog CLI setup uses the /artifactory path.
           REGISTRY_HOST=$(echo ${{ secrets.JFROG_PLATFORM_URL }} | sed 's|^https://||' | sed 's|/$||')
           
           # 2. Define the TAG using the project version and short commit SHA
