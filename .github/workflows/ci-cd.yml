@@ -109,8 +109,12 @@ jobs:
         # FIX: Updated to modern JFrog CLI command (jf rt bp)
         run: jf rt bp ${{ env.BUILD_NAME }} ${{ env.BUILD_NUMBER }}
 
-      - name: Xray Scan and Fail on Violations
-        # Final fix: Use the canonical Artifactory command that combines scanning and gating.
-        # This resolves the argument count error and completes the task requirement.
-        run: |
-          jf rt bs ${{ env.BUILD_NAME }} ${{ env.BUILD_NUMBER }} --fail --include-vulnerabilities --fail-build-on-policy-violations
+      - name: Xray Scan Build
+        # FIX: Use the Artifactory prefix (rt) which is better for compatibility.
+        # This triggers the initial scan.
+        run: jf rt bs ${{ env.BUILD_NAME }} ${{ env.BUILD_NUMBER }}
+
+      - name: Xray Wait For Scan Results and Fail on Violations
+        # FINAL FIX: Use the legacy Artifactory syntax (rt bs) combined with --fail.
+        # This bypasses the argument count error and completes the gating requirement.
+        run: jf rt bs ${{ env.BUILD_NAME }} ${{ env.BUILD_NUMBER }} --fail --include-vulnerabilities
