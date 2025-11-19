@@ -110,14 +110,11 @@ jobs:
         run: jf rt bp ${{ env.BUILD_NAME }} ${{ env.BUILD_NUMBER }}
 
       - name: Xray Scan Build
-        # FIX: Updated to modern JFrog CLI command (jf rt bs)
-        # Triggers a scan on the build published in the previous step
+        # This triggers the initial scan.
         run: jf build-scan ${{ env.BUILD_NAME }} ${{ env.BUILD_NUMBER }}
 
       - name: Xray Wait For Scan Results and Fail on Violations
-        # FIX: Updated to modern JFrog CLI command (jf rt bs)
-        # Waits for the scan to finish and fails the job if any policy violations are found.
-        # This is crucial for pipeline gating.
+        # FIX: Separated the scan and the wait/fail operation. The --wait is applied here.
         run: jf build-scan ${{ env.BUILD_NAME }} ${{ env.BUILD_NUMBER }} --wait
 
       - name: Print Final Image Path
