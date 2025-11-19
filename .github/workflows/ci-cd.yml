@@ -109,14 +109,8 @@ jobs:
         # FIX: Updated to modern JFrog CLI command (jf rt bp)
         run: jf rt bp ${{ env.BUILD_NAME }} ${{ env.BUILD_NUMBER }}
 
-      - name: Xray Scan Build
-        # This triggers the initial scan.
-        run: jf build-scan ${{ env.BUILD_NAME }} ${{ env.BUILD_NUMBER }}
-
-      - name: Xray Wait For Scan Results and Fail on Violations
-        # FIX: Separated the scan and the wait/fail operation. The --wait is applied here.
-        run: jf build-scan ${{ env.BUILD_NAME }} ${{ env.BUILD_NUMBER }} --wait
-
-      - name: Print Final Image Path
+      - name: Xray Scan and Fail on Violations
+        # Final fix: Use the canonical Artifactory command that combines scanning and gating.
+        # This resolves the argument count error and completes the task requirement.
         run: |
-          echo "Successfully pushed image: ${{ steps.tagging.outputs.FULL_IMAGE_NAME }}"
+          jf rt bs ${{ env.BUILD_NAME }} ${{ env.BUILD_NUMBER }} --fail --include-vulnerabilities --fail-build-on-policy-violations
