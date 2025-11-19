@@ -52,13 +52,11 @@ jobs:
 
       - name: Configure JFrog CLI Server
         run: |
-          # Use JFrog CLI to add the server configuration manually.
-          # We force the URL to the root platform URL (stripping trailing slash) 
-          # which resolves the 404/protocol scheme issue for this SaaS instance.
+          # FINAL FIX: Configure CLI using only the URL and token. 
+          # This relies on the token being passed cleanly, which should now work.
           jf c add ${{ env.SERVER_ID }} \
             --url=${{ secrets.JFROG_PLATFORM_URL }} \
-            --access-token=${{ secrets.JFROG_ACCESS_TOKEN }} \
-            --user=${{ secrets.JFROG_USERNAME }}
+            --access-token=${{ secrets.JFROG_ACCESS_TOKEN }}
           
           # Use the newly configured server for all subsequent commands
           jf c use ${{ env.SERVER_ID }}
@@ -114,13 +112,13 @@ jobs:
       - name: Xray Scan Build
         # FIX: Updated to modern JFrog CLI command (jf rt bs)
         # Triggers a scan on the build published in the previous step
-        run: jf rt bs ${{ env.BUILD_NAME }} ${{ env.BUILD_NUMBER }}
+        run: jf build-scan ${{ env.BUILD_NAME }} ${{ env.BUILD_NUMBER }}
 
       - name: Xray Wait For Scan Results and Fail on Violations
         # FIX: Updated to modern JFrog CLI command (jf rt bs)
         # Waits for the scan to finish and fails the job if any policy violations are found.
         # This is crucial for pipeline gating.
-        run: jf rt bs ${{ env.BUILD_NAME }} ${{ env.BUILD_NUMBER }} --wait
+        run: jf build-scan ${{ env.BUILD_NAME }} ${{ env.BUILD_NUMBER }} --wait
 
       - name: Print Final Image Path
         run: |
