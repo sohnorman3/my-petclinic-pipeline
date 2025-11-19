@@ -116,5 +116,5 @@ jobs:
 
       - name: Xray Wait For Scan Results and Fail on Violations
         # FINAL FIX: Use the legacy Artifactory syntax (rt bs) combined with --fail.
-        # This bypasses the argument count error and completes the gating requirement.
-        run: jf rt bs ${{ env.BUILD_NAME }} ${{ env.BUILD_NUMBER }} --fail --include-vulnerabilities
+        # Removed the undefined flag entirely. This is the simplest, most compatible syntax.
+        run: jf rt bs ${{ env.BUILD_NAME }} ${{ env.BUILD_NUMBER }} --fail
