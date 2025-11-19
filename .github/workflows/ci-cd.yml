@@ -43,19 +43,20 @@ jobs:
           ./mvnw clean install -Dmaven.enforcer.skip=true
 
       # --- 2. SETUP JFROG CLI & CONFIGURE DOCKER LOGIN (Manual CLI Setup) ---
-      # This replaces the jfrog/setup-jfrog-cli action to fix the persistent URL protocol error.
+      # This step installs the CLI and manually configures the server connection.
+      # This bypasses the buggy action helper and resolves the "unsupported protocol scheme" error.
       - name: Install JFrog CLI
         uses: jfrog/setup-jfrog-cli@v4
         with:
-          version: latest  # <<< FIXED: Changed from '2' to 'latest'
+          version: latest
 
       - name: Configure JFrog CLI Server
         run: |
           # Use JFrog CLI to add the server configuration manually.
-          # We explicitly define the Artifactory URL with the /artifactory context path 
-          # which resolves the "unsupported protocol scheme" error for SaaS instances.
+          # We force the URL to the root platform URL (stripping trailing slash) 
+          # which resolves the 404/protocol scheme issue for this SaaS instance.
           jf c add ${{ env.SERVER_ID }} \
-            --url=${{ secrets.JFROG_PLATFORM_URL }}/artifactory \
+            --url=${{ secrets.JFROG_PLATFORM_URL }} \
             --access-token=${{ secrets.JFROG_ACCESS_TOKEN }} \
             --user=${{ secrets.JFROG_USERNAME }}
           
