@@ -43,12 +43,14 @@ jobs:
 
       # --- 2. SETUP JFROG CLI & CONFIGURE DOCKER LOGIN ---
       - name: Setup JFrog CLI and Configure Server
-        # CRITICAL FIX: Pass secrets directly to avoid 'unsupported protocol scheme' error
+        # CRITICAL FIX: Pass secrets directly and use the full Artifactory path
         uses: jfrog/setup-jfrog-cli@v4
         with:
-          url: ${{ secrets.JFROG_PLATFORM_URL }} # PASS DIRECTLY
-          access-token: ${{ secrets.JFROG_ACCESS_TOKEN }} # PASS DIRECTLY
-          username: ${{ secrets.JFROG_USERNAME }} # PASS DIRECTLY
+          # We assume the secret contains the base URL: https://<instance>.jfrog.io
+          # JFrog CLI requires the Artifactory service context path, which is usually /artifactory
+          url: ${{ secrets.JFROG_PLATFORM_URL }}/artifactory 
+          access-token: ${{ secrets.JFROG_ACCESS_TOKEN }} 
+          username: ${{ secrets.JFROG_USERNAME }}
 
       # Retrieve project version from pom.xml for dynamic tagging
       - name: Extract Project Version
@@ -59,6 +61,7 @@ jobs:
         id: tagging
         run: |
           # 1. Strip protocol and trailing slash from the URL to get a clean registry hostname
+          # Using the original secret value here, as the JFrog CLI setup uses the /artifactory path.
           REGISTRY_HOST=$(echo ${{ secrets.JFROG_PLATFORM_URL }} | sed 's|^https://||' | sed 's|/$||')
           
           # 2. Define the TAG using the project version and short commit SHA
